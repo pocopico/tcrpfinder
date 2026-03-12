@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find TCRP / DSM · Network Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0:#080b0f; --bg1:#0d1117; --bg2:#131920; --bg3:#1a2230;
+  --border:#1f2d3d; --border2:#2a3f55;
+  --green:#00ff88; --blue:#00c4ff; --amber:#ffaa00; --red:#ff4455;
+  --t1:#e8edf3; --t2:#8a9ab0; --t3:#4a5a70;
+  --mono:'JetBrains Mono',monospace; --head:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg0);color:var(--t1);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);
+  background-size:40px 40px}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px)}
+.app{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 20px 60px}
+
+header{width:100%;max-width:900px;padding:44px 0 24px;text-align:center}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
+.logo-box{width:44px;height:44px;border:1.5px solid var(--green);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 20px rgba(0,255,136,.25),inset 0 0 14px rgba(0,255,136,.04)}
+h1{font-family:var(--head);font-size:clamp(26px,5vw,42px);font-weight:800;letter-spacing:-.03em}
+h1 em{color:var(--green);font-style:normal}
+.sub{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
+
+/* ── Direct connect banner ─────────────────────────────────────────── */
+.direct-banner{
+  width:100%;max-width:900px;
+  background:linear-gradient(135deg,rgba(0,255,136,.08),rgba(0,196,255,.05));
+  border:1px solid rgba(0,255,136,.3);border-radius:12px;
+  padding:18px 22px;margin-bottom:18px;
+  display:none;align-items:center;gap:18px;flex-wrap:wrap
+}
+.direct-banner.show{display:flex}
+.direct-pulse{width:12px;height:12px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 10px var(--green);flex-shrink:0;animation:blink 1.8s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.direct-info{flex:1}
+.direct-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:4px}
+.direct-host{font-family:var(--head);font-size:18px;font-weight:700}
+.direct-ip{font-size:12px;color:var(--green);margin-top:2px}
+
+/* ── Card ──────────────────────────────────────────────────────────── */
+.card{width:100%;max-width:900px;background:var(--bg1);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;margin-bottom:16px}
+.card-hdr{padding:13px 20px;border-bottom:1px solid var(--border);background:var(--bg2);
+  display:flex;align-items:center;gap:12px}
+.dots{display:flex;gap:6px}.dots span{width:10px;height:10px;border-radius:50%}
+.dots .r{background:#ff5f56}.dots .y{background:#ffbd2e}.dots .g{background:#27c93f}
+.card-title{font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;flex:1;text-align:center}
+.card-body{padding:20px 22px}
+
+/* ── Quick-test row ─────────────────────────────────────────────────── */
+.quicktest{display:flex;gap:8px;align-items:center;margin-bottom:18px;padding:12px 14px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px}
+.quicktest-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);
+  white-space:nowrap}
+.quicktest input{background:var(--bg3);border:1px solid var(--border2);border-radius:5px;
+  color:var(--t1);font-family:var(--mono);font-size:12px;padding:6px 10px;outline:none;
+  flex:1;transition:border-color .15s}
+.quicktest input:focus{border-color:var(--green)}
+.btn-test{background:transparent;color:var(--blue);border:1px solid var(--blue);border-radius:6px;
+  font-family:var(--mono);font-size:11px;padding:6px 14px;cursor:pointer;white-space:nowrap;
+  transition:all .15s}
+.btn-test:hover{background:rgba(0,196,255,.1)}
+.qt-result{font-size:11px;color:var(--t3);margin-left:4px;display:none}
+.qt-result.show{display:block}
+.qt-result.ok{color:var(--green)}.qt-result.fail{color:var(--red)}.qt-result.warn{color:var(--amber)}
+
+/* ── Subnet chips ───────────────────────────────────────────────────── */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid var(--border2);
+  color:var(--t3);background:var(--bg3);cursor:pointer;transition:all .12s;font-family:var(--mono)}
+.chip:hover{border-color:var(--green);color:var(--green)}
+.chip.on{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.07)}
+
+/* ── Input row ──────────────────────────────────────────────────────── */
+.irow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.ig{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px}
+.ilabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3)}
+input.inp{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;
+  color:var(--t1);font-family:var(--mono);font-size:13px;padding:9px 12px;outline:none;
+  transition:border-color .15s,box-shadow .15s;width:100%}
+input.inp:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,255,136,.1)}
+.port-ig{flex:0;min-width:88px;max-width:88px}
+.btn-go{background:var(--green);color:var(--bg0);border:none;border-radius:8px;
+  font-family:var(--mono);font-size:13px;font-weight:600;padding:10px 22px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;transition:all .15s;align-self:flex-end}
+.btn-go:hover:not(:disabled){background:#1affaa;box-shadow:0 0 18px rgba(0,255,136,.4)}
+.btn-go:disabled{opacity:.4;cursor:not-allowed}
+.btn-halt{background:transparent;color:var(--red);border:1px solid var(--red);border-radius:8px;
+  font-family:var(--mono);font-size:12px;padding:9px 16px;cursor:pointer;white-space:nowrap;
+  flex-shrink:0;transition:all .15s;align-self:flex-end;display:none}
+.btn-halt:hover{background:rgba(255,68,85,.1)}
+
+/* ── Progress ───────────────────────────────────────────────────────── */
+.prog{display:none;margin-bottom:10px}
+.prog.on{display:block}
+.ptrack{height:2px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.pfill{height:100%;width:0%;background:linear-gradient(90deg,var(--green),var(--blue));
+  border-radius:2px;transition:width .2s;box-shadow:0 0 8px rgba(0,255,136,.5)}
+.pstats{display:flex;gap:16px;font-size:11px;color:var(--t3);flex-wrap:wrap}
+.pstats .hi{color:var(--green)}
+.beam-row{display:none;align-items:center;gap:8px;font-size:11px;color:var(--green);margin-top:8px}
+.beam-row.on{display:flex}
+.beam{width:56px;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);
+  background-size:200%;animation:beam 1.5s linear infinite;border-radius:1px}
+@keyframes beam{0%{background-position:-100% 0}100%{background-position:200% 0}}
+
+/* ── Warning box ────────────────────────────────────────────────────── */
+.warnbox{display:none;background:rgba(255,170,0,.07);border:1px solid rgba(255,170,0,.2);
+  border-radius:8px;padding:13px 15px;font-size:12px;color:var(--amber);line-height:1.85;margin-top:14px}
+.warnbox.on{display:block}
+.warnbox code{background:rgba(255,170,0,.12);border-radius:3px;padding:1px 4px;font-size:11px}
+.warnbox a{color:var(--amber)}
+
+/* ── Log ────────────────────────────────────────────────────────────── */
+.logbox{background:var(--bg0);border:1px solid var(--border);border-radius:6px;
+  padding:10px 13px;font-size:11px;color:var(--t3);height:120px;overflow-y:auto;line-height:1.75;margin-top:14px}
+.logbox .ok{color:var(--green)}.logbox .found{color:var(--blue);font-weight:600}
+.logbox .dsm{color:var(--blue)}.logbox .warn{color:var(--amber)}.logbox .dim{color:var(--t3)}
+
+/* ── Results ────────────────────────────────────────────────────────── */
+#results{width:100%;max-width:900px}
+.rlabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;padding-left:2px}
+.nc{background:var(--bg1);border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  margin-bottom:14px;animation:cin .3s ease both;transition:border-color .2s,box-shadow .2s}
+.nc:hover{border-color:var(--green);box-shadow:0 0 22px rgba(0,255,136,.1)}
+@keyframes cin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.nc-hdr{padding:13px 20px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:11px}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);
+  flex-shrink:0;animation:blink 2s ease infinite}
+.sdot.building{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.sdot.failed{background:var(--red);box-shadow:0 0 8px var(--red);animation:none}
+.nc-host{font-family:var(--head);font-size:15px;font-weight:700;flex:1}
+.nc-ip{font-size:12px;color:var(--green);font-family:var(--mono)}
+.nc-body{padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}
+.kl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:3px}
+.kv{font-size:13px;color:var(--t2)}.kv.g{color:var(--green)}.kv.y{color:var(--amber)}.kv.r{color:var(--red)}
+.nc-ftr{padding:11px 20px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:center}
+.btn-open{background:var(--green);color:var(--bg0);border:none;border-radius:6px;font-family:var(--mono);
+  font-size:12px;font-weight:600;padding:8px 16px;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn-open:hover{background:#1affaa;box-shadow:0 0 12px rgba(0,255,136,.4)}
+.btn-sm{background:transparent;color:var(--t3);border:1px solid var(--border2);border-radius:6px;
+  font-family:var(--mono);font-size:11px;padding:7px 12px;cursor:pointer;text-decoration:none;transition:all .12s}
+.btn-sm:hover{color:var(--t1);border-color:var(--t3)}
+.nc-uptime{margin-left:auto;font-size:11px;color:var(--t3)}
+
+/* ── DSM card ───────────────────────────────────────────────────────── */
+.nc.dsm{border-color:rgba(0,196,255,.25)}
+.nc.dsm:hover{border-color:var(--blue);box-shadow:0 0 22px rgba(0,196,255,.1)}
+.nc.dsm .nc-hdr{background:rgba(0,196,255,.06)}
+.nc.dsm .nc-ip{color:var(--blue)}
+.dsm-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px var(--blue);
+  flex-shrink:0;animation:blink 2s ease infinite}
+.dsm-badge{font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;
+  border-radius:20px;background:rgba(0,196,255,.1);border:1px solid rgba(0,196,255,.25);
+  color:var(--blue);font-family:var(--mono);margin-left:auto}
+.dsm-badge.installing{background:rgba(255,170,0,.1);border-color:rgba(255,170,0,.3);color:var(--amber)}
+.btn-open-dsm{background:var(--blue);color:var(--bg0);border:none;border-radius:6px;font-family:var(--mono);
+  font-size:12px;font-weight:600;padding:8px 16px;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn-open-dsm:hover{background:#33d4ff;box-shadow:0 0 12px rgba(0,196,255,.4)}
+
+.empty{text-align:center;padding:40px 20px;color:var(--t3);font-size:13px;line-height:2}
+.empty-icon{font-size:28px;margin-bottom:8px;opacity:.35}
+
+.note{width:100%;max-width:900px;border:1px solid var(--border);border-radius:8px;
+  padding:13px 17px;font-size:11px;color:var(--t3);line-height:1.9;margin-top:2px}
+.note strong{color:var(--t2)}.note code{background:var(--bg3);border-radius:3px;padding:1px 4px}
+.note a{color:var(--blue);text-decoration:none}
+
+@media(max-width:580px){.irow{flex-direction:column}.port-ig{max-width:100%}.nc-body{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo-row">
+    <div class="logo-box">
+      <svg viewBox="0 0 20 20" fill="none" width="22">
+        <circle cx="10" cy="10" r="8" stroke="#00ff88" stroke-width="1.5"/>
+        <circle cx="10" cy="10" r="3" fill="#00ff88"/>
+        <path d="M10 2v2M10 16v2M2 10h2M16 10h2" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h1>Find <em>TCRP</em> <span style="color:var(--blue);font-style:normal">/ DSM</span></h1>
+  </div>
+  <p class="sub">TinyCore RedPill Loader &amp; Synology DSM · Network Scanner</p>
+</header>
+
+<!-- Direct connect banner — shown when ?ip= param present -->
+<div class="direct-banner" id="direct-banner">
+  <div class="direct-pulse"></div>
+  <div class="direct-info">
+    <div class="direct-label">Direct Link</div>
+    <div class="direct-host" id="direct-host">—</div>
+    <div class="direct-ip" id="direct-ip">—</div>
+  </div>
+  <div id="direct-actions"></div>
+</div>
+
+<div class="card">
+  <div class="card-hdr">
+    <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="card-title">network scanner</div>
+  </div>
+  <div class="card-body">
+
+    <!-- Quick-test: type a known IP to test it directly without scanning -->
+    <div class="quicktest">
+      <span class="quicktest-label">Test IP</span>
+      <input id="qt-ip" placeholder="192.168.1.100" spellcheck="false">
+      <input id="qt-port" value="5000" type="number" style="width:72px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--t1);font-family:var(--mono);font-size:12px;padding:6px 10px;outline:none">
+      <button class="btn-test" onclick="quickTest()">Test →</button>
+      <span class="qt-result" id="qt-result"></span>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="irow">
+      <div class="ig">
+        <div class="ilabel">Subnet (first 3 octets)</div>
+        <input class="inp" id="inp-subnet" placeholder="192.168.1" value="192.168.1">
+      </div>
+      <div class="ig port-ig">
+        <div class="ilabel">Port</div>
+        <input class="inp" id="inp-port" value="5000" type="number" min="1" max="65535">
+      </div>
+      <button class="btn-go"   id="btn-scan" onclick="startScan()">▶  Scan</button>
+      <button class="btn-halt" id="btn-stop" onclick="stopScan()">■  Stop</button>
+    </div>
+
+    <div class="prog" id="prog">
+      <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+      <div class="pstats">
+        <span>Probed: <span class="hi" id="s-prob">0</span>&thinsp;/&thinsp;254</span>
+        <span>Open: <span class="hi" id="s-open">0</span></span>
+        <span>Found: <span class="hi" id="s-found">0</span></span>
+        <span><span class="hi" id="s-rate">0</span>/s</span>
+      </div>
+      <div class="beam-row" id="beam"><div class="beam"></div><span id="beam-lbl">initialising…</span></div>
+    </div>
+
+    <div class="warnbox" id="warnbox"></div>
+    <div class="logbox" id="log"></div>
+  </div>
+</div>
+
+<div id="results"></div>
+
+<div class="note">
+  <strong>How it works:</strong>
+  Phase&nbsp;1 — fast TCP probes across all 254 host addresses (smart-ordered: likely TCRP ranges first).
+  Phase&nbsp;2 — confirmed-open ports are queried at <code>/api/discover</code> for TCRP, then the root page is fingerprinted for <strong>Synology DSM</strong> (Web Assistant).
+  Subnet is auto-detected via WebRTC; select a chip or type one manually if detection misses.
+  Requires <strong>tcrp-node&nbsp;≥&nbsp;0.11</strong> with the updated <code>server.js</code>
+  (adds <code>Access-Control-Allow-Private-Network:&nbsp;true</code> for Chrome compatibility).
+  DSM detection works on port&nbsp;<code>5000</code> — both pre-install (setup wizard) and post-install (login) states are identified.
+  <br>
+  <strong>Chrome users:</strong> if the scan finds open ports but no TCRP, use the
+  <strong>Test IP</strong> box above to pinpoint the issue, or try Firefox.
+  <a href="https://github.com/pocopico/tinycore-redpill" target="_blank" rel="noopener">TCRP repo</a>
+</div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Config
+// ─────────────────────────────────────────────────────────────────────────────
+const BATCH       = 30;    // parallel probes per wave
+const PROBE_MS    = 500;   // timeout for TCP probe (closed port = fast RST < 5ms; no-route = full timeout)
+const DISCOVER_MS = 3000;  // timeout for /api/discover call
+const COMMON_SUBNETS = ['192.168.1','192.168.0','192.168.2','192.168.10',
+                         '10.0.0','10.0.1','172.16.0','172.16.1'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+let scanning=false, halt=false, foundCount=0, openCount=0, probedCount=0, t0=0;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WebRTC local subnet detection
+//
+// Chrome 75+ mDNS obfuscation means host candidates look like "abc123.local",
+// not real IPs. Fix: use a real STUN server so we get srflx candidates whose
+// "raddr" field IS the actual LAN IP.
+// Fallback: parse the SDP offer "c=" line which sometimes has the real IP.
+// Also try stun.cloudflare.com in parallel in case one is unreachable.
+// ─────────────────────────────────────────────────────────────────────────────
+function detectSubnets() {
+  return new Promise(resolve => {
+    const subnets = new Set();
+    let closed = false;
+
+    function finish() {
+      if (closed) return;
+      closed = true;
+      resolve([...subnets]);
+    }
+
+    // Helper: extract subnet from IP string
+    function addIP(ip) {
+      if (!ip || ip.startsWith('127.') || ip.startsWith('169.254.')) return;
+      const s = ip.split('.').slice(0, 3).join('.');
+      if (s) subnets.add(s);
+    }
+
+    // Strategy 1 + 2: two STUN servers in parallel
+    const stunServers = [
+      [{ urls: 'stun:stun.l.google.com:19302' }],
+      [{ urls: 'stun:stun.cloudflare.com:3478' }],
+    ];
+
+    let pending = stunServers.length;
+    for (const iceServers of stunServers) {
+      try {
+        const pc = new RTCPeerConnection({ iceServers });
+        pc.createDataChannel('');
+        pc.createOffer().then(o => {
+          pc.setLocalDescription(o);
+          // Strategy 3: parse SDP "c=" line for local IP (before mDNS kicks in on candidates)
+          const sdp = o.sdp || '';
+          const cLine = sdp.match(/^c=IN IP4 (\d+\.\d+\.\d+\.\d+)/m);
+          if (cLine) addIP(cLine[1]);
+        }).catch(() => {});
+
+        pc.onicecandidate = e => {
+          if (!e.candidate) {
+            pc.close();
+            pending--;
+            if (pending === 0) finish();
+            return;
+          }
+          const c = e.candidate.candidate;
+          // srflx: "... <reflex-ip> ... typ srflx raddr <LOCAL-IP> rport ..."
+          const raddr = c.match(/\btyp srflx\b.*?\braddr\s+(\d+\.\d+\.\d+\.\d+)/);
+          if (raddr) { addIP(raddr[1]); return; }
+          // host with real IP (Firefox, older Chrome)
+          const host = c.match(/^candidate:\S+\s+\d+\s+\S+\s+\d+\s+(\d+\.\d+\.\d+\.\d+)\s/);
+          if (host && c.includes('typ host')) addIP(host[1]);
+        };
+
+        setTimeout(() => { try { pc.close(); } catch {} pending--; if (pending <= 0) finish(); }, 4000);
+      } catch {
+        pending--;
+        if (pending === 0) finish();
+      }
+    }
+
+    // Absolute fallback after 5s
+    setTimeout(finish, 5000);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subnet chips
+// ─────────────────────────────────────────────────────────────────────────────
+function buildChips(detected) {
+  const all = [...new Set([...detected, ...COMMON_SUBNETS])];
+  document.getElementById('chips').innerHTML = all.map((s, i) =>
+    `<div class="chip${i===0?' on':''}" data-s="${s}" onclick="pickChip(this)">${s}.x</div>`
+  ).join('');
+  if (all.length) document.getElementById('inp-subnet').value = all[0];
+}
+function pickChip(el) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('inp-subnet').value = el.dataset.s;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quick-test: probe a specific IP directly and show headers/result
+// This is the fastest way to debug PNA / CORS issues without a full scan
+// ─────────────────────────────────────────────────────────────────────────────
+async function quickTest() {
+  const ip   = document.getElementById('qt-ip').value.trim();
+  const port = document.getElementById('qt-port').value || '5000';
+  const res  = document.getElementById('qt-result');
+  if (!ip) return;
+
+  res.className = 'qt-result show warn';
+  res.textContent = 'testing…';
+
+  try {
+    const r = await fetchWithTimeout(`http://${ip}:${port}/api/discover`, 3000);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (d.app === 'tcrp-node') {
+      res.className = 'qt-result show ok';
+      res.textContent = `✓ Found: ${d.hostname} — ${d.model || 'no model'} ${d.dsm_version || ''}`;
+      renderCard({ ip, port: Number(port), ...d });
+    } else {
+      res.className = 'qt-result show warn';
+      res.textContent = `Port open but not TCRP (got: ${d.app || 'unknown'})`;
+    }
+  } catch (e) {
+    const msg = e.message || '';
+    res.className = 'qt-result show fail';
+    if (msg.includes('NetworkError') || msg.includes('Failed to fetch')) {
+      res.innerHTML = '✗ Blocked. Likely Chrome PNA — try Firefox, or see note below';
+      showPNAWarning(ip, port);
+    } else {
+      res.textContent = `✗ ${msg || 'No response'}`;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Probe helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function fetchWithTimeout(url, ms, opts = {}) {
+  const ac = new AbortController();
+  const t  = setTimeout(() => ac.abort(), ms);
+  return fetch(url, { ...opts, signal: ac.signal, cache: 'no-store' })
+    .finally(() => clearTimeout(t));
+}
+
+// Phase 1: Is port open?
+// Chrome PNA: closed port → TCP RST → fetch rejects almost instantly (<10ms)
+//             open port + PNA block → OPTIONS returns 204 then GET proceeds
+//               OR → PNA preflight denied → rejects in ~50ms
+//             no route → SYN never answered → AbortError after PROBE_MS
+//
+// We use a simple rule: AbortError (timed out) = treat as open.
+// Fast rejection (<30ms) = closed. Anything else = potentially open.
+// This avoids the flaky timing threshold from before.
+function probePort(ip, port) {
+  return new Promise(resolve => {
+    const tStart = Date.now();
+    const ac = new AbortController();
+    const timer = setTimeout(() => { ac.abort(); }, PROBE_MS);
+
+    fetch(`http://${ip}:${port}/api/discover`, {
+      cache: 'no-store', signal: ac.signal,
+      headers: { Accept: 'application/json' },
+    })
+    .then(r => {
+      clearTimeout(timer);
+      // Response received — port is definitely open
+      // Try to parse as TCRP right away (saves Phase 2 round-trip)
+      const result = { open: true };
+      if (r.ok) {
+        r.json().then(d => resolve({ ...result, data: d })).catch(() => resolve(result));
+      } else {
+        resolve(result);
+      }
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      const ms = Date.now() - tStart;
+      if (err.name === 'AbortError') {
+        // Timed out — no RST received — could be open (filtered) or no route
+        resolve({ open: true, timeout: true });
+      } else {
+        // Network error — distinguish by speed:
+        // < 30ms: almost certainly a TCP RST (port closed / host unreachable with RST)
+        // > 30ms: connection was made but then blocked (PNA block, CORS, non-HTTP)
+        resolve({ open: ms > 30, pna: ms > 30 });
+      }
+    });
+  });
+}
+
+// Phase 2: full discovery on confirmed-open port
+function fetchDiscover(ip, port) {
+  return new Promise(resolve => {
+    fetchWithTimeout(`http://${ip}:${port}/api/discover`, DISCOVER_MS, {
+      headers: { Accept: 'application/json' },
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => resolve(d?.app === 'tcrp-node' ? { ip, port, ...d } : null))
+    .catch(() => resolve(null));
+  });
+}
+
+// Phase 2b: check if a host is running Synology DSM
+//
+// Known Synology HTML signatures across all states:
+//   Port 5000 root:       title "Synology Redirect CGI" + meta-refresh → web_index.html
+//   Port 5000/web_index.html: full Web Assistant SPA (webman/uistring.cgi)
+//   Port 80  root:        title "Synology Web Assistant" + JS redirect to :5000
+
+// Phase 2b: check if a host is running Synology DSM.
+// Tries known Synology URLs and fingerprints the HTML body.
+// Works reliably when the page is served from http:// (Firefox always, Chrome from http://).
+// Probes: :5000 root, :5000/web_index.html, :80 root — first match wins.
+async function fetchDSM(ip) {
+  const FAST_MS = 1500;
+
+  async function tryBody(url) {
+    try {
+      const r = await fetchWithTimeout(url, FAST_MS);
+      if (!r.ok) return null;
+      return await r.text().catch(() => null);
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function isSynology(html) {
+    if (!html) return null;
+    if (/Synology\s+Redirect\s+CGI/i.test(html))                  return 'running';
+    if (/Synology\s+Web\s+Assistant/i.test(html))                  return 'assistant';
+    if (/webman\/uistring\.cgi/i.test(html))                       return 'assistant';
+    if (/synology/i.test(html) && /window\.location/i.test(html)) return 'running';
+    return null;
+  }
+
+  const urls = [
+    `http://${ip}:5000`,
+    `http://${ip}:5000/web_index.html`,
+    `http://${ip}`,
+  ];
+
+  for (const url of urls) {
+    const html = await tryBody(url);
+    const sig  = isSynology(html);
+    if (sig) return { ip, installing: sig === 'assistant' };
+  }
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Smart scan order — prioritise likely TCRP addresses
+// .1–20 = gateway / static; .100–130 = common static; .50–99, .131–199 = DHCP
+// ─────────────────────────────────────────────────────────────────────────────
+function buildOrder() {
+  const p = [...range(1,20), ...range(100,130), ...range(200,230),
+             ...range(21,49), ...range(50,99), ...range(131,199), ...range(231,254)];
+  return [...new Set(p)];
+}
+function range(a, b) { return Array.from({ length: b-a+1 }, (_, i) => a+i); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scan orchestration
+// ─────────────────────────────────────────────────────────────────────────────
+async function startScan() {
+  if (scanning) return;
+
+  const subnet = document.getElementById('inp-subnet').value.trim().replace(/\.+$/, '');
+  const port   = parseInt(document.getElementById('inp-port').value) || 5000;
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(subnet)) {
+    log('warn', `Invalid subnet "${subnet}" — format: 192.168.1`); return;
+  }
+
+  // Reset
+  scanning=true; halt=false; foundCount=0; openCount=0; probedCount=0; t0=Date.now();
+  document.getElementById('btn-scan').disabled = true;
+  document.getElementById('btn-stop').style.display = 'block';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('warnbox').className = 'warnbox';
+  document.getElementById('prog').className = 'prog on';
+  document.getElementById('beam').className  = 'beam-row on';
+  setStats();
+
+  log('dim', `── ${subnet}.1–254 : port ${port} ──`);
+  if (location.protocol === 'https:')
+    log('warn', 'HTTPS origin — Chrome PNA in effect. Use Test IP box if scan fails.');
+
+  const hosts   = buildOrder().map(n => `${subnet}.${n}`);
+  const openSet = []; // { ip, data? }
+  let pnaCount  = 0;
+
+  // ── Phase 1: TCP probe ──
+  for (let i = 0; i < hosts.length; i += BATCH) {
+    if (halt) break;
+    const batch = hosts.slice(i, i + BATCH);
+    document.getElementById('beam-lbl').textContent = batch[0] + ' … ' + batch[batch.length-1];
+
+    const results = await Promise.all(batch.map(ip => probePort(ip, port)));
+    results.forEach((r, j) => {
+      probedCount++;
+      if (r.open) {
+        openSet.push({ ip: batch[j], data: r.data });
+        openCount++;
+        if (r.pna) pnaCount++;
+        // If Phase 1 already got TCRP data, show immediately
+        if (r.data?.app === 'tcrp-node') {
+          const node = { ip: batch[j], port, ...r.data };
+          foundCount++;
+          renderCard(node);
+          log('found', `✓  ${batch[j]}:${port}  ${node.hostname}  ${node.model||''}  ${node.dsm_version||''}`);
+          document.getElementById('s-found').textContent = foundCount;
+        }
+      }
+    });
+    setStats();
+  }
+
+  // ── Phase 2: identify open hosts not already resolved ──
+  const phase2 = openSet.filter(h => !h.data || h.data.app !== 'tcrp-node');
+  // Track IPs already resolved so Phase 3 doesn't double-report
+  const resolvedIPs = new Set(
+    openSet.filter(h => h.data?.app === 'tcrp-node').map(h => h.ip)
+  );
+
+  if (phase2.length) {
+    document.getElementById('beam-lbl').textContent = `identifying ${phase2.length} open port(s)…`;
+    log('dim', `Phase 2: querying ${phase2.length} host(s)…`);
+    await Promise.all(phase2.map(async h => {
+      if (halt) return;
+      // Try TCRP first
+      const node = await fetchDiscover(h.ip, port);
+      if (node) {
+        foundCount++;
+        resolvedIPs.add(h.ip);
+        renderCard(node);
+        log('found', `✓  ${h.ip}:${port}  ${node.hostname}  ${node.model||''}  ${node.dsm_version||''}`);
+        document.getElementById('s-found').textContent = foundCount;
+        return;
+      }
+      // Not TCRP — check if it's Synology DSM via body fingerprint
+      const dsm = await fetchDSM(h.ip);
+      if (dsm) {
+        foundCount++;
+        resolvedIPs.add(h.ip);
+        renderDSMCard(dsm);
+        log('found', `✓  ${h.ip}:5000  Synology DSM${dsm.installing ? ' (web assistant)' : ' (running)'}`);
+        document.getElementById('s-found').textContent = foundCount;
+      }
+    }));
+  }
+
+  // ── Phase 3: DSM sweep ──
+  // Fetch :5000 on every unresolved host and fingerprint the HTML body.
+  // Works on Firefox always, and on Chrome when served from http://.
+  if (!halt) {
+    document.getElementById('beam-lbl').textContent = 'DSM sweep…';
+    log('dim', 'Phase 3: DSM sweep…');
+    const dsmCandidates = hosts.filter(ip => !resolvedIPs.has(ip));
+
+    for (let i = 0; i < dsmCandidates.length; i += BATCH) {
+      if (halt) break;
+      const batch = dsmCandidates.slice(i, i + BATCH);
+      await Promise.all(batch.map(async ip => {
+        if (halt || resolvedIPs.has(ip)) return;
+        const dsm = await fetchDSM(ip);
+        if (dsm && !resolvedIPs.has(ip)) {
+          foundCount++;
+          resolvedIPs.add(ip);
+          renderDSMCard(dsm);
+          log('found', `✓  ${ip}:5000  Synology DSM${dsm.installing ? ' (web assistant)' : ' (running)'}`);
+          document.getElementById('s-found').textContent = foundCount;
+        }
+      }));
+    }
+  }
+
+  finish(pnaCount);
+}
+
+function stopScan() {
+  halt=true; scanning=false;
+  document.getElementById('beam').className = 'beam-row';
+  document.getElementById('btn-scan').disabled = false;
+  document.getElementById('btn-stop').style.display = 'none';
+  log('warn', 'Stopped by user.');
+}
+
+function finish(pnaCount) {
+  scanning=false;
+  document.getElementById('btn-scan').disabled = false;
+  document.getElementById('btn-stop').style.display = 'none';
+  document.getElementById('beam').className = 'beam-row';
+  document.getElementById('pfill').style.width = '100%';
+  log('dim', `── Done: ${foundCount} node(s) in ${((Date.now()-t0)/1000).toFixed(1)}s ──`);
+
+  if (!foundCount) {
+    document.getElementById('results').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">◎</div>
+        <div>No TCRP loader or Synology DSM found.</div>
+        <div style="margin-top:5px;font-size:12px">
+          ${openCount
+            ? `${openCount} port(s) were open but didn't identify as TCRP or DSM.`
+            : 'No open port ' + document.getElementById('inp-port').value + ' found — is the device running?'}
+        </div>
+      </div>`;
+    if (pnaCount > 0 || (openCount > 0 && location.protocol === 'https:')) {
+      showPNAWarning();
+    }
+  }
+}
+
+function showPNAWarning(ip, port) {
+  const wb = document.getElementById('warnbox');
+  wb.className = 'warnbox on';
+  const portVal = port || document.getElementById('inp-port').value;
+  const testUrl = ip ? `http://${ip}:${portVal}/api/discover` : null;
+  wb.innerHTML = `
+    <strong>⚠ Chrome Private Network Access (PNA) is likely blocking responses.</strong><br>
+    Your browser is on an HTTPS page (${location.origin}) fetching HTTP LAN addresses.
+    Chrome requires the TCRP server to send <code>Access-Control-Allow-Private-Network: true</code>
+    in its OPTIONS preflight response.<br><br>
+    <strong>Quick fixes:</strong><br>
+    <strong>1.</strong> Use <strong>Firefox</strong> — no PNA restrictions, works immediately.<br>
+    <strong>2.</strong> Chrome flag: open <code>chrome://flags/#block-insecure-private-network-requests</code>
+       → <strong>Disabled</strong> → relaunch.<br>
+    <strong>3.</strong> Deploy updated <strong>server.js</strong> (from latest tcrp-node package) —
+       it adds the required PNA header.<br>
+    ${testUrl ? `<strong>4.</strong> Open <a href="${testUrl}" target="_blank">${testUrl}</a>
+       directly to verify the server is reachable.` : ''}`;
+}
+
+function setStats() {
+  const rate = t0 ? Math.round(probedCount / ((Date.now()-t0)/1000)) : 0;
+  document.getElementById('pfill').style.width  = (probedCount/254*100) + '%';
+  document.getElementById('s-prob').textContent = probedCount;
+  document.getElementById('s-open').textContent = openCount;
+  document.getElementById('s-rate').textContent = rate;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render node card
+// ─────────────────────────────────────────────────────────────────────────────
+function renderCard(node) {
+  const res = document.getElementById('results');
+  if (!res.querySelector('.rlabel')) res.innerHTML = '<div class="rlabel">Discovered Loaders &amp; DiskStations</div>';
+  const sc = {success:'g',building:'y',failed:'r'}[node.build_state] || '';
+  const sl = {success:'Built ✓',building:'Building…',failed:'Build failed',idle:'Idle'}[node.build_state] || node.build_state || '—';
+  const dc = {building:'building',failed:'failed'}[node.build_state] || '';
+  const up = node.uptime_s
+    ? (node.uptime_s < 3600 ? Math.floor(node.uptime_s/60)+'m' : (node.uptime_s/3600).toFixed(1)+'h') + ' uptime'
+    : '';
+  const url = `http://${node.ip}:${node.port}`;
+  const card = document.createElement('div');
+  card.className = 'nc';
+  card.innerHTML = `
+    <div class="nc-hdr">
+      <div class="sdot ${dc}"></div>
+      <div class="nc-host">${esc(node.hostname || node.ip)}</div>
+      <div class="nc-ip">${node.ip}:${node.port}</div>
+    </div>
+    <div class="nc-body">
+      <div><div class="kl">Model</div><div class="kv g">${esc(node.model||'—')}</div></div>
+      <div><div class="kl">DSM Version</div><div class="kv">${esc(node.dsm_version||'—')}</div></div>
+      <div><div class="kl">Build Status</div><div class="kv ${sc}">${sl}</div></div>
+      <div><div class="kl">RedPill Make</div><div class="kv">${esc(node.redpillmake||'—')}</div></div>
+      <div><div class="kl">tcrp-node</div><div class="kv">${esc(node.version||'—')}</div></div>
+    </div>
+    <div class="nc-ftr">
+      <a class="btn-open" href="${url}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 14 14" fill="none" width="12"><path d="M2 7h10M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Open UI
+      </a>
+      <a class="btn-sm" href="${url}/api/discover" target="_blank" rel="noopener">JSON</a>
+      <div class="nc-uptime">${up}</div>
+    </div>`;
+  res.appendChild(card);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render DSM card
+// ─────────────────────────────────────────────────────────────────────────────
+function renderDSMCard(node) {
+  const res = document.getElementById('results');
+  if (!res.querySelector('.rlabel')) res.innerHTML = '<div class="rlabel">Discovered Loaders &amp; DiskStations</div>';
+  const url = `http://${node.ip}:5000`;
+  const installing = node.installing;
+  const card = document.createElement('div');
+  card.className = 'nc dsm';
+  card.innerHTML = `
+    <div class="nc-hdr">
+      <div class="dsm-dot"></div>
+      <div class="nc-host">${esc(node.ip)}</div>
+      <div class="nc-ip">${node.ip}:5000</div>
+      <span class="dsm-badge${installing?' installing':''}">${installing ? '⚙ Web Assistant' : 'DSM Running'}</span>
+    </div>
+    <div class="nc-body">
+      <div><div class="kl">Type</div><div class="kv" style="color:var(--blue)">Synology DSM</div></div>
+      <div><div class="kl">Status</div><div class="kv${installing?' y':' g'}">${installing ? 'Web Assistant' : 'Running'}</div></div>
+      <div><div class="kl">Address</div><div class="kv">${esc(node.ip)}</div></div>
+      <div><div class="kl">Port</div><div class="kv">5000</div></div>
+    </div>
+    <div class="nc-ftr">
+      <a class="btn-open-dsm" href="${url}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 14 14" fill="none" width="12"><path d="M2 7h10M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Open DSM
+      </a>
+      <div class="nc-uptime">${installing ? 'Setup in progress' : 'Ready to log in'}</div>
+    </div>`;
+  res.appendChild(card);
+}
+
+function log(cls, msg) {
+  const el = document.getElementById('log');
+  const ts = new Date().toTimeString().slice(0,8);
+  el.innerHTML += `<div class="${cls}"><span style="color:var(--t3)">${ts}</span>  ${esc(msg)}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ?ip= direct connect — no scan needed
+// tcrp-node dashboard links to https://pocopico.github.io/find-tcrp/?ip=x.x.x.x
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkDirectParam() {
+  const params = new URLSearchParams(location.search);
+  const ip     = params.get('ip');
+  const port   = parseInt(params.get('port') || '5000');
+  if (!ip) return false;
+
+  const banner = document.getElementById('direct-banner');
+  document.getElementById('direct-ip').textContent = `${ip}:${port}`;
+  document.getElementById('direct-host').textContent = 'Connecting…';
+  banner.classList.add('show');
+
+  log('ok', `Direct link: querying ${ip}:${port}…`);
+  const node = await fetchDiscover(ip, port);
+  if (node) {
+    document.getElementById('direct-host').textContent = node.hostname || ip;
+    document.getElementById('direct-actions').innerHTML = `
+      <a class="btn-open" href="http://${ip}:${port}" target="_blank" rel="noopener">Open UI →</a>`;
+    renderCard(node);
+    log('found', `✓ ${ip}:${port}  ${node.hostname}  ${node.model||''}  ${node.dsm_version||''}`);
+  } else {
+    document.getElementById('direct-host').textContent = ip;
+    document.getElementById('direct-ip').textContent = 'Could not connect — see PNA note';
+    document.getElementById('direct-ip').style.color = 'var(--amber)';
+    log('warn', `Could not reach ${ip}:${port} — try the Test IP box`);
+    document.getElementById('qt-ip').value = ip;
+    document.getElementById('qt-port').value = port;
+    showPNAWarning(ip, port);
+  }
+  return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+(async () => {
+  // 1. Handle ?ip= direct link first
+  const direct = await checkDirectParam();
+
+  // 2. Detect subnet via WebRTC
+  log('dim', 'Detecting local subnet…');
+  const subnets = await detectSubnets();
+  if (subnets.length) {
+    log('ok', `Detected subnet(s): ${subnets.join(', ')}`);
+    buildChips(subnets);
+  } else {
+    log('warn', 'WebRTC subnet detection unavailable — select manually');
+    buildChips([]);
+  }
+})();
+</script>
+</body>
+</html>
