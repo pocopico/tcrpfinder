@@ -518,6 +518,8 @@ async function fetchDSM(ip) {
     if (/webman\/uistring/i.test(html))                               return 'assistant';
     if (/web_index\.html/i.test(html))                                return 'running';
     if (/synology/i.test(html) && /window\.location/i.test(html))    return 'running';
+    // HTTPS-only mode: port 5000 redirects to :5001 via JS location.replace
+    if (/location\.replace/i.test(html) && /:5001/i.test(html))      return 'running';
     return null;
   }
 
@@ -532,10 +534,25 @@ async function fetchDSM(ip) {
     if (sig) return { ip, installing: sig === 'assistant' };
   }
 
-  // Strategy 2: no-cors probe — body unreadable but we can confirm port open
-  // and use the redirect target path itself as the fingerprint.
-  // DSM root always redirects to web_index.html — check if that path exists.
-  // A successful no-cors fetch to /web_index.html (not a RST) = DSM.
+  // Strategy 2: DSM HTTPS-only mode — port 5000 JS-redirects to :5001.
+  // We can't follow the HTTPS redirect (mixed content), but we can confirm
+  // nginx is listening on :5001 by sending a plain HTTP request to it.
+  // nginx responds with "400 Bad Request" (plain HTTP to HTTPS port) — that
+  // 400 body is readable cross-origin because nginx sends no CORS restrictions,
+  // but more reliably: the port responds at all, which confirms DSM is running.
+  try {
+    const ac = new AbortController();
+    const t  = setTimeout(() => ac.abort(), FAST_MS);
+    // no-cors so browser doesn't block on missing CORS headers
+    const r  = await fetch(`http://${ip}:5001`, {
+      mode: 'no-cors', cache: 'no-store', signal: ac.signal,
+    });
+    clearTimeout(t);
+    // Any response (opaque or not) on :5001 alongside an open :5000 = DSM HTTPS mode
+    if (r.type === 'opaque' || r.ok) return { ip, installing: false, https: true };
+  } catch(e) { /* port 5001 not open */ }
+
+  // Strategy 3: no-cors probe on /web_index.html (Web Assistant mode)
   try {
     const ac = new AbortController();
     const t  = setTimeout(() => ac.abort(), FAST_MS);
@@ -543,9 +560,8 @@ async function fetchDSM(ip) {
       mode: 'no-cors', cache: 'no-store', signal: ac.signal,
     });
     clearTimeout(t);
-    // no-cors: r.type === 'opaque', status === 0, but no exception = port open + responded
     if (r.type === 'opaque') return { ip, installing: true };
-  } catch(e) { /* port closed or no route */ }
+  } catch(e) { /* not DSM */ }
 
   return null;
 }
@@ -818,6 +834,7 @@ function renderDSMCard(node) {
   if (!res.querySelector('.rlabel')) res.innerHTML = '<div class="rlabel">Discovered Loaders &amp; DiskStations</div>';
   const url = `http://${node.ip}:5000`;
   const installing = node.installing;
+  const httpsMode  = node.https === true;
   const card = document.createElement('div');
   card.className = 'nc dsm';
   card.innerHTML = `
@@ -825,16 +842,16 @@ function renderDSMCard(node) {
       <div class="dsm-dot"></div>
       <div class="nc-host">${esc(node.ip)}</div>
       <div class="nc-ip">${node.ip}:5000</div>
-      <span class="dsm-badge${installing?' installing':''}">${installing ? '⚙ Web Assistant' : 'DSM Running'}</span>
+      <span class="dsm-badge${installing?' installing':httpsMode?' https':''}">${installing ? '⚙ Web Assistant' : httpsMode ? 'DSM Running (HTTPS)' : 'DSM Running'}</span>
     </div>
     <div class="nc-body">
       <div><div class="kl">Type</div><div class="kv" style="color:var(--blue)">Synology DSM</div></div>
-      <div><div class="kl">Status</div><div class="kv${installing?' y':' g'}">${installing ? 'Web Assistant' : 'Running'}</div></div>
+      <div><div class="kl">Status</div><div class="kv${installing?' y':' g'}">${installing ? 'Web Assistant' : httpsMode ? 'Running (HTTPS :5001)' : 'Running'}</div></div>
       <div><div class="kl">Address</div><div class="kv">${esc(node.ip)}</div></div>
       <div><div class="kl">Port</div><div class="kv">5000</div></div>
     </div>
     <div class="nc-ftr">
-      <a class="btn-open-dsm" href="${url}" target="_blank" rel="noopener">
+      <a class="btn-open-dsm" href="${httpsMode ? `https://${node.ip}:5001` : url}" target="_blank" rel="noopener">
         <svg viewBox="0 0 14 14" fill="none" width="12"><path d="M2 7h10M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Open DSM
       </a>
